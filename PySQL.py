@@ -44,6 +44,8 @@ class Database(object):
                         {} {}
                     VALUES
                         {};'''
+    dump_sql = '''INSERT INTO {table}
+                      SELECT {select} {union};'''
     
     def __init__(self, db_file):
         self.create_connection(db_file)
@@ -142,6 +144,46 @@ class Database(object):
             except Error as e:
                 print(e)
         return True
+    
+    def dump(self, table_name, data_pile, column_tuple=None):
+        '''
+        TODO
+        '''
+        
+        flattened_pile = []
+        for row in data_pile:
+            for datum in row:
+                flattened_pile.append(datum)
+        flattened_pile = tuple(flattened_pile)
+        
+        if table_name not in self.insides.keys():
+            if column_tuple:
+                self.create_table(table_name, column_tuple)
+            else:
+                return False
+        
+        if not column_tuple:
+            column_tuple = self.insides[table_name]
+        
+        select_sql = []
+        for column in column_tuple:
+            select_sql.append('(?) AS {}'.format(scrub(column)))
+        select_sql = ', '.join(select_sql)
+        
+        union_sql = ''
+        for i in range(len(data_pile) - 1):
+            union_sql += '\nUNION ALL SELECT {}'.format(', '.join(('(?),' * len(column_tuple)).split(',')[:-1]))
+        
+        dump_sql_formatted = self.dump_sql.format(table=scrub(table_name),
+                                                  select=scrub(select_sql),
+                                                  union=scrub(union_sql))
+        with self.conn:
+            try:
+                c = self.conn.cursor()
+                c.execute(dump_sql_formatted, flattened_pile)
+            except Error as e:
+                print(e)
+        return True
      
     def select_all(self, table_name):
         '''
@@ -203,15 +245,19 @@ class Database(object):
     
  
 if __name__ == '__main__':
+    import pprint
+    
     my_db = Database('pythonsqlite.db')
     my_db.create_table('hi', ('title', 'body'))
     
     my_db.insert('hi', (1, 4))
     my_db.insert('bi', ('hmm', '["ouch", "oof"]'), ('title', 'body'))
     
-    print(my_db.select_all('hi'))
+    my_db.dump('hi', [[1, 2], [3, 4], ['a', 'b']], ('title', 'body'))
+    
+    pprint.pprint(my_db.select_all('hi'))
     print(' ')
-    print(my_db.select_all('bi'))
+    pprint.pprint(my_db.select_all('bi'))
     
     
     
