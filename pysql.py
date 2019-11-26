@@ -166,9 +166,17 @@ class Database(object):
         '''
         
         if not columns:
-            columns = ['*']
+            self.get_tables()
+            
+            if table_name in self.insides.keys():
+                columns = []
+                
+                for column in self.insides[table_name]:
+                    columns.append(column)
+            else:
+                raise Exception('Table not found in db')
         
-        if (not type(columns) == list) or (not type(columns) == tuple):
+        if (not type(columns) == list) and (not type(columns) == tuple):
             columns = [columns]
         
         query = 'SELECT {} FROM {}'
